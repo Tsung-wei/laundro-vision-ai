@@ -163,3 +163,71 @@ def test_osm_provider_enrich_cafe_not_starbucks(mock_post):
     provider = OSMMapProvider()
     result = provider.enrich_location(25.0, 121.0)
     assert result["has_starbucks"] is False
+
+
+@responses.activate
+def test_google_map_provider_enrich_location(monkeypatch):
+    monkeypatch.setattr(
+        "laundro_vision_ai.services.location.get_settings", lambda: Settings(GOOGLE_MAPS_API_KEY="test_key")
+    )
+    provider = GoogleMapProvider()
+
+    # Mock nearbysearch for laundry
+    responses.add(
+        responses.GET,
+        "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
+        json={"results": [{"name": "Wash & Go"}], "status": "OK"},
+        status=200,
+        match=[
+            responses.matchers.query_param_matcher(
+                {"location": "25.0,121.0", "radius": "1000", "type": "laundry", "key": "test_key"}
+            )
+        ],
+    )
+
+    # Mock nearbysearch for convenience_store
+    responses.add(
+        responses.GET,
+        "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
+        json={"results": [{"name": "7-11"}], "status": "OK"},
+        status=200,
+        match=[
+            responses.matchers.query_param_matcher(
+                {"location": "25.0,121.0", "radius": "200", "type": "convenience_store", "key": "test_key"}
+            )
+        ],
+    )
+
+    # Mock nearbysearch for McDonald's
+    responses.add(
+        responses.GET,
+        "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
+        json={"results": [{"name": "McDonald's"}], "status": "OK"},
+        status=200,
+        match=[
+            responses.matchers.query_param_matcher(
+                {"location": "25.0,121.0", "radius": "200", "keyword": "McDonald's|麥當勞", "key": "test_key"}
+            )
+        ],
+    )
+
+    # Mock nearbysearch for Starbucks
+    responses.add(
+        responses.GET,
+        "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
+        json={"results": [], "status": "ZERO_RESULTS"},
+        status=200,
+        match=[
+            responses.matchers.query_param_matcher(
+                {"location": "25.0,121.0", "radius": "200", "keyword": "Starbucks|星巴克", "key": "test_key"}
+            )
+        ],
+    )
+
+    result = provider.enrich_location(25.0, 121.0)
+
+    assert result["has_competitor_in_1000m"] is True
+    assert result["competitors_data"] == ["Wash & Go"]
+    assert "7-11" in result["cvs_mcd_in_200m"]
+    assert "McDonald's" in result["cvs_mcd_in_200m"]
+    assert result["has_starbucks"] is False

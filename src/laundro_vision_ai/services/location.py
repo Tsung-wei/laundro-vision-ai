@@ -112,7 +112,51 @@ class GoogleMapProvider(MapProvider):
         return location["lat"], location["lng"]
 
     def enrich_location(self, lat: float, lng: float) -> dict:
-        return {}
+        settings = get_settings()
+        api_key = settings.GOOGLE_MAPS_API_KEY
+        if not api_key:
+            raise ValueError("GOOGLE_MAPS_API_KEY is not set")
+
+        base_url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+        location_str = f"{lat},{lng}"
+
+        # 1. Competitors (1000m)
+        competitors = []
+        resp_laundry = requests.get(
+            base_url, params={"location": location_str, "radius": 1000, "type": "laundry", "key": api_key}
+        )
+        if resp_laundry.status_code == 200 and resp_laundry.json().get("status") in ("OK", "ZERO_RESULTS"):
+            competitors = [r.get("name") for r in resp_laundry.json().get("results", [])]
+
+        # 2. CVS (200m)
+        cvs_mcd = []
+        resp_cvs = requests.get(
+            base_url, params={"location": location_str, "radius": 200, "type": "convenience_store", "key": api_key}
+        )
+        if resp_cvs.status_code == 200 and resp_cvs.json().get("status") in ("OK", "ZERO_RESULTS"):
+            cvs_mcd.extend([r.get("name") for r in resp_cvs.json().get("results", [])])
+
+        # 3. McDonald's (200m)
+        resp_mcd = requests.get(
+            base_url, params={"location": location_str, "radius": 200, "keyword": "McDonald's|麥當勞", "key": api_key}
+        )
+        if resp_mcd.status_code == 200 and resp_mcd.json().get("status") in ("OK", "ZERO_RESULTS"):
+            cvs_mcd.extend([r.get("name") for r in resp_mcd.json().get("results", [])])
+
+        # 4. Starbucks (200m)
+        has_starbucks = False
+        resp_starbucks = requests.get(
+            base_url, params={"location": location_str, "radius": 200, "keyword": "Starbucks|星巴克", "key": api_key}
+        )
+        if resp_starbucks.status_code == 200 and resp_starbucks.json().get("status") == "OK":
+            has_starbucks = len(resp_starbucks.json().get("results", [])) > 0
+
+        return {
+            "has_competitor_in_1000m": len(competitors) > 0,
+            "competitors_data": competitors,
+            "cvs_mcd_in_200m": cvs_mcd,
+            "has_starbucks": has_starbucks,
+        }
 
 
 def calculate_q1_score(has_starbucks: bool, cvs_mcd: list[str]) -> int:
