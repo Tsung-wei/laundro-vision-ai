@@ -1,54 +1,61 @@
+[build-system]
+build-backend = "uv_build"
+requires = [ "uv-build>=0.9,<0.10" ]
+
 [project]
 name = "laundro-vision-ai"
 version = "0.1.0"
 description = "An AI-driven self-service laundromat site selection decision support system."
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = [
-    "pydantic>=2.13.0",
+classifiers = [
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
 ]
-
-[build-system]
-requires = ["uv_build>=0.9.0,<0.10.0"]
-build-backend = "uv_build"
+dependencies = [
+  "httpx>=0.27",
+  "pydantic>=2.13",
+  "pydantic-settings>=2.2",
+  "requests>=2.33.1",
+  "respx>=0.23.1",
+]
 
 [dependency-groups]
 dev = [
-    "black>=26.3.1",
-    "coverage>=7.10.7",
-    "hypothesis>=6.152.2",
-    "pre-commit>=4.6.0",
-    "pyright>=1.1.409",
-    "pytest>=9.0.3",
-    "pytest-cov>=7.1.0",
-    "ruff>=0.15.12",
+  "black>=26.3.1",
+  "coverage>=7.10.7",
+  "hypothesis>=6.152.2",
+  "pre-commit>=4.6",
+  "pyright>=1.1.409",
+  "pytest>=9.0.3",
+  "pytest-cov>=7.1",
+  "respx>=0.20.2",
+  "ruff>=0.15.12",
 ]
 
 [tool.black]
 line-length = 120
-target-version = ['py311']
-
-[tool.coverage.run]
-branch = true
-source = ["src/laundro_vision_ai"]
-command_line = "-m pytest"
-
-[tool.coverage.report]
-fail_under = 90
-show_missing = true
+target-version = [ "py311" ]
 
 [tool.ruff]
+target-version = "py311"
 line-length = 120
 indent-width = 4
-target-version = "py311"
+format.indent-style = "space"
+format.quote-style = "double"
+format.docstring-code-format = true
+lint.select = [ "E", "F", "I", "W" ]  # Basic error, flake8-builtins, warnings, isort
+lint.extend-select = [ "B" ]  # Extend with bugbear rules
+lint.ignore = [ "E501" ]  # Ignore line too long, if using an external formatter like Black
+lint.unfixable = [ "F841" ]  # Mark unused local variables as unfixable
 
-[tool.ruff.lint]
-select = ["E", "F", "W", "I"] # Basic error, flake8-builtins, warnings, isort
-ignore = ["E501"] # Ignore line too long, if using an external formatter like Black
-extend-select = ["B"] # Extend with bugbear rules
-unfixable = ["F841"] # Mark unused local variables as unfixable
-
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
-docstring-code-format = true
+[tool.coverage]
+run.branch = true
+run.command_line = "-m pytest"
+run.source = [ "src/laundro_vision_ai" ]
+report.fail_under = 90
+report.omit = [ "src/laundro_vision_ai/ui/*" ]
+report.show_missing = true

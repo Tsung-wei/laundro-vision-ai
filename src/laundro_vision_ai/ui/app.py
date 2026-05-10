@@ -26,6 +26,10 @@ def init_session():
         st.session_state.has_competitor = False
     if "competitor_knockout" not in st.session_state:
         st.session_state.competitor_knockout = False
+    if "recommended_q1_score" not in st.session_state:
+        st.session_state.recommended_q1_score = 5
+    if "cvs_mcd_in_200m" not in st.session_state:
+        st.session_state.cvs_mcd_in_200m = []
 
 
 def render_init():
@@ -37,10 +41,24 @@ def render_init():
     address = st.text_input("地址/街道").strip()
     st.write(f"您選擇的地址是：{city}{district}{address}")
     if st.button("搜尋周邊"):
-        # Mock: assume competitor exists for demo
-        st.session_state.has_competitor = True
-        st.session_state.stage = "COMPETITOR_EVAL"
-        st.rerun()
+        full_address = f"{city}{district}{address}"
+        with st.spinner("Geocoding and scanning for competitors..."):
+            try:
+                res = requests.post(f"{API_BASE_URL}/locations/enrich", json={"address": full_address})
+                res.raise_for_status()
+                data = res.json()
+
+                st.session_state.has_competitor = data["has_competitor_in_1000m"]
+                st.session_state.recommended_q1_score = data["recommended_q1_score"]
+                st.session_state.cvs_mcd_in_200m = data["cvs_mcd_in_200m"]
+
+                if st.session_state.has_competitor:
+                    st.session_state.stage = "COMPETITOR_EVAL"
+                else:
+                    st.session_state.stage = "TARGET_EVAL"
+                st.rerun()
+            except requests.exceptions.RequestException as e:
+                st.error(f"API Request Failed: {e}")
 
 
 def render_competitor_eval():
@@ -71,8 +89,13 @@ def render_competitor_eval():
 
 def render_target_eval():
     st.header("Step 3: 候選店址評估")
-    st.info("Q1 已由 API 預填為 5")
-    q1 = 5
+    cvs_list = st.session_state.get("cvs_mcd_in_200m", [])
+    st.info(f"API 探測周邊 POI: {cvs_list}")
+
+    default_q1_index = st.session_state.get("recommended_q1_score", 5) - 1
+
+    q1 = st.radio("Q1. CVS / 麥當勞", [1, 2, 3, 4, 5], index=default_q1_index, horizontal=True)
+
     q2 = st.radio("Q2. 住宅型態", [1, 2, 3, 4, 5], horizontal=True)
     q3 = st.radio("Q3. 視覺攔截力", [1, 2, 3, 4, 5], horizontal=True)
     q4 = st.radio("Q4. 招牌設立", [1, 2, 3, 4, 5], horizontal=True)
