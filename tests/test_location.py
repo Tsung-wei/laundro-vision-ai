@@ -231,3 +231,11 @@ def test_google_map_provider_enrich_location(monkeypatch):
     assert "7-11" in result["cvs_mcd_in_200m"]
     assert "McDonald's" in result["cvs_mcd_in_200m"]
     assert result["has_starbucks"] is False
+
+
+def test_get_map_provider_google(monkeypatch):
+    monkeypatch.setattr("laundro_vision_ai.services.location.get_settings", lambda: Settings(MAP_PROVIDER="GOOGLE"))
+    from laundro_vision_ai.services.location import GoogleMapProvider, get_map_provider
+
+    provider = get_map_provider()
+    assert isinstance(provider, GoogleMapProvider)
