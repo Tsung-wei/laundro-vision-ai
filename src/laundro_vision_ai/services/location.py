@@ -141,13 +141,22 @@ class GoogleMapProvider(MapProvider):
             places = resp_laundry.json().get("places", [])
             competitors = [p.get("displayName", {}).get("text") for p in places if p.get("displayName")]
 
-        # 2. CVS (200m) - Temporarily commented out for Task 1
+        # 2. CVS (200m)
         cvs_mcd = []
-        # resp_cvs = requests.get(
-        #     base_url, params={"location": location_str, "radius": 200, "type": "convenience_store", "key": api_key}
-        # )
-        # if resp_cvs.status_code == 200 and resp_cvs.json().get("status") in ("OK", "ZERO_RESULTS"):
-        #     cvs_mcd.extend([r.get("name") for r in resp_cvs.json().get("results", [])])
+        payload_cvs = {
+            "includedTypes": ["convenience_store"],
+            "maxResultCount": 20,
+            "locationRestriction": {
+                "circle": {
+                    "center": {"latitude": lat, "longitude": lng},
+                    "radius": 200.0,
+                }
+            },
+        }
+        resp_cvs = requests.post(search_nearby_url, headers=headers, json=payload_cvs)
+        if resp_cvs.status_code == 200:
+            places = resp_cvs.json().get("places", [])
+            cvs_mcd.extend([p.get("displayName", {}).get("text") for p in places if p.get("displayName")])
 
         # 3. McDonald's (200m) - Temporarily commented out for Task 1
         # resp_mcd = requests.get(
