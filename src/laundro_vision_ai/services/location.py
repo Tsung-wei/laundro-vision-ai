@@ -1,4 +1,6 @@
+import math
 from abc import ABC, abstractmethod
+from logging import Logger
 
 import requests
 
@@ -6,6 +8,9 @@ from laundro_vision_ai.core.config import get_settings
 
 
 class MapProvider(ABC):
+    def __init__(self, logger: Logger):
+        self._logger = logger
+
     @abstractmethod
     def geocode(self, address: str) -> tuple[float, float]:
         """Converts an address string into (latitude, longitude)."""
@@ -83,13 +88,13 @@ class OSMMapProvider(MapProvider):
         }
 
 
-def get_map_provider() -> MapProvider:
+def get_map_provider(logger: Logger) -> MapProvider:
     provider = get_settings().MAP_PROVIDER
     if provider == "MOCK":
-        return MockMapProvider()
+        return MockMapProvider(logger)
     elif provider == "GOOGLE":
-        return GoogleMapProvider()
-    return OSMMapProvider()
+        return GoogleMapProvider(logger)
+    return OSMMapProvider(logger)
 
 
 class GoogleMapProvider(MapProvider):
@@ -104,6 +109,7 @@ class GoogleMapProvider(MapProvider):
         response = requests.get(url, params=params)
         response.raise_for_status()
         data = response.json()
+        self._logger.info(f"Geocode response for '{address}': {data}")
 
         if data.get("status") != "OK" or not data.get("results"):
             raise ValueError(f"Could not geocode address: {address}")
@@ -137,6 +143,7 @@ class GoogleMapProvider(MapProvider):
             },
         }
         resp_laundry = requests.post(search_nearby_url, headers=headers, json=payload_laundry)
+        self._logger.info(f"Competitor search response: {resp_laundry.json()}")
         if resp_laundry.status_code == 200:
             places = resp_laundry.json().get("places", [])
             competitors = [p.get("displayName", {}).get("text") for p in places if p.get("displayName")]
@@ -154,6 +161,7 @@ class GoogleMapProvider(MapProvider):
             },
         }
         resp_cvs = requests.post(search_nearby_url, headers=headers, json=payload_cvs)
+        self._logger.info(f"CVS search response: {resp_cvs.json()}")
         if resp_cvs.status_code == 200:
             places = resp_cvs.json().get("places", [])
             cvs_mcd.extend([p.get("displayName", {}).get("text") for p in places if p.get("displayName")])
@@ -171,6 +179,7 @@ class GoogleMapProvider(MapProvider):
             },
         }
         resp_mcd = requests.post(search_text_url, headers=headers, json=payload_mcd)
+        self._logger.info(f"McDonald's search response: {resp_mcd.json()}")
         if resp_mcd.status_code == 200:
             places = resp_mcd.json().get("places", [])
             cvs_mcd.extend([p.get("displayName", {}).get("text") for p in places if p.get("displayName")])
@@ -189,6 +198,7 @@ class GoogleMapProvider(MapProvider):
         }
         resp_starbucks = requests.post(search_text_url, headers=headers, json=payload_sb)
         if resp_starbucks.status_code == 200:
+            self._logger.info(f"Starbucks search response: {resp_starbucks.json()}")
             places = resp_starbucks.json().get("places", [])
             has_starbucks = len(places) > 0
 
@@ -198,6 +208,24 @@ class GoogleMapProvider(MapProvider):
             "cvs_mcd_in_200m": cvs_mcd,
             "has_starbucks": has_starbucks,
         }
+
+
+def get_bounding_box(lat: float, lng: float, radius_meters: float) -> tuple[dict, dict]:
+    """Calculates a bounding box (low, high) coordinates for a given radius."""
+    # Earth's radius in meters
+    earth_radius = 6378137.0
+
+    # Coordinate offsets in radians
+    d_lat = radius_meters / earth_radius
+    d_lng = radius_meters / (earth_radius * math.cos(math.radians(lat)))
+
+    # Offset in degrees
+    d_lat_deg = math.degrees(d_lat)
+    d_lng_deg = math.degrees(d_lng)
+
+    low = {"latitude": lat - d_lat_deg, "longitude": lng - d_lng_deg}
+    high = {"latitude": lat + d_lat_deg, "longitude": lng + d_lng_deg}
+    return low, high
 
 
 def calculate_q1_score(has_starbucks: bool, cvs_mcd: list[str]) -> int:

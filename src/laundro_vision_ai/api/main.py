@@ -1,3 +1,5 @@
+import logging
+
 import uvicorn
 from fastapi import FastAPI, HTTPException
 
@@ -11,6 +13,13 @@ from laundro_vision_ai.models.schemas import (
 )
 from laundro_vision_ai.services.location import calculate_q1_score, get_map_provider
 from laundro_vision_ai.services.scoring import calculate_total_score, evaluate_competitor
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="LaundroVision AI MVP API")
 
@@ -29,7 +38,7 @@ def calculate_score_route(req: AssessmentRequest):
 
 @app.post("/api/v1/locations/enrich", response_model=LocationEnrichResponse)
 def enrich_location_route(req: LocationEnrichRequest):
-    provider = get_map_provider()
+    provider = get_map_provider(logger=logger)
     lat, lng = req.lat, req.lng
 
     if lat is None or lng is None:
@@ -40,6 +49,7 @@ def enrich_location_route(req: LocationEnrichRequest):
 
     try:
         data = provider.enrich_location(lat, lng)
+        print(data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"POI search failed: {str(e)}") from e
 
